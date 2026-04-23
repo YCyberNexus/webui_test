@@ -43,7 +43,6 @@ function buildInjectedScript() {
         if (!(target instanceof Element)) {
           return null;
         }
-
         return target.matches(interactiveSelector) ? target : target.closest(interactiveSelector);
       }
 
@@ -82,9 +81,7 @@ function buildInjectedScript() {
 
         const segments = [];
         let current = element;
-
         while (current && current.nodeType === Node.ELEMENT_NODE) {
-          const tagName = current.tagName.toLowerCase();
           let index = 1;
           let previous = current.previousElementSibling;
           while (previous) {
@@ -93,7 +90,7 @@ function buildInjectedScript() {
             }
             previous = previous.previousElementSibling;
           }
-          segments.unshift(tagName + '[' + index + ']');
+          segments.unshift(current.tagName.toLowerCase() + '[' + index + ']');
           current = current.parentElement;
         }
 
@@ -111,26 +108,21 @@ function buildInjectedScript() {
 
         const parts = [];
         let current = element;
-
         while (current && current.nodeType === Node.ELEMENT_NODE) {
           let part = current.tagName.toLowerCase();
-
           if (current.classList.length > 0) {
             part += '.' + CSS.escape(current.classList[0]);
           }
-
           const parent = current.parentElement;
           if (parent) {
-            const sameTagSiblings = Array.from(parent.children).filter((child) => child.tagName === current.tagName);
-            if (sameTagSiblings.length > 1) {
-              part += ':nth-of-type(' + (sameTagSiblings.indexOf(current) + 1) + ')';
+            const siblings = Array.from(parent.children).filter((child) => child.tagName === current.tagName);
+            if (siblings.length > 1) {
+              part += ':nth-of-type(' + (siblings.indexOf(current) + 1) + ')';
             }
           }
-
           parts.unshift(part);
           current = parent;
         }
-
         return parts.join(' > ');
       }
 
@@ -163,120 +155,32 @@ function buildInjectedScript() {
         postToParent('NAVIGATE_TO_URL', { url: absoluteUrl });
       }
 
-      function blockDefaultNavigation(event, target) {
-        if (!target) {
-          return;
-        }
-
-        event.preventDefault();
-        event.stopPropagation();
-        if (typeof event.stopImmediatePropagation === 'function') {
-          event.stopImmediatePropagation();
-        }
-
-        const form = target.closest('form');
-        if (form) {
-          form.setAttribute('target', '_self');
-        }
-
-        const anchor = target.closest('a[href]');
-        if (anchor) {
-          anchor.setAttribute('target', '_self');
+      function publishHover(target) {
+        updateOverlay(target);
+        if (target) {
+          postToParent('ELEMENT_HOVER', getElementInfo(target));
+        } else {
+          postToParent('ELEMENT_LEAVE', {});
         }
       }
 
-      function stopEvent(event) {
-        event.preventDefault();
-        event.stopPropagation();
-        if (typeof event.stopImmediatePropagation === 'function') {
-          event.stopImmediatePropagation();
-        }
-        return false;
-      }
+      document.addEventListener('mousemove', (event) => {
+        publishHover(getInteractiveTarget(event.target));
+      }, true);
 
       document.addEventListener('mouseover', (event) => {
-        const target = getInteractiveTarget(event.target);
-        updateOverlay(target);
+        publishHover(getInteractiveTarget(event.target));
+      }, true);
+
+      document.addEventListener('mouseout', (event) => {
+        if (!event.relatedTarget || !(event.relatedTarget instanceof Element)) {
+          publishHover(null);
+        }
       }, true);
 
       document.addEventListener('scroll', () => {
         const hovered = document.querySelector(':hover');
-        updateOverlay(getInteractiveTarget(hovered));
-      }, true);
-
-      document.addEventListener('pointerdown', (event) => {
-        const target = getInteractiveTarget(event.target);
-        if (!target) {
-          return;
-        }
-
-        blockDefaultNavigation(event, target);
-      }, true);
-
-      document.addEventListener('mouseup', (event) => {
-        const target = getInteractiveTarget(event.target);
-        if (!target) {
-          return;
-        }
-
-        blockDefaultNavigation(event, target);
-      }, true);
-
-      document.addEventListener('click', (event) => {
-        const target = getInteractiveTarget(event.target);
-        if (!target) {
-          return;
-        }
-
-        blockDefaultNavigation(event, target);
-        updateOverlay(target);
-        postToParent('ELEMENT_SELECT', getElementInfo(target));
-
-        const anchor = target.closest('a[href]');
-        if (anchor) {
-          interceptNavigation(anchor.getAttribute('href'));
-        }
-        return false;
-      }, true);
-
-      document.addEventListener('dblclick', (event) => {
-        const target = getInteractiveTarget(event.target);
-        if (!target) {
-          return;
-        }
-
-        blockDefaultNavigation(event, target);
-      }, true);
-
-      document.addEventListener('auxclick', (event) => {
-        const target = getInteractiveTarget(event.target);
-        if (!target) {
-          return;
-        }
-
-        blockDefaultNavigation(event, target);
-      }, true);
-
-      document.addEventListener('mousedown', (event) => {
-        const target = getInteractiveTarget(event.target);
-        if (!target) {
-          return;
-        }
-
-        if (event.button === 0 || event.button === 1) {
-          blockDefaultNavigation(event, target);
-        }
-      }, true);
-
-      document.addEventListener('keydown', (event) => {
-        const active = getInteractiveTarget(document.activeElement);
-        if (!active) {
-          return;
-        }
-
-        if (event.key === 'Enter' || event.key === ' ') {
-          blockDefaultNavigation(event, active);
-        }
+        publishHover(getInteractiveTarget(hovered));
       }, true);
 
       document.addEventListener('contextmenu', (event) => {
@@ -286,8 +190,18 @@ function buildInjectedScript() {
         }
 
         event.preventDefault();
-        updateOverlay(target);
+        publishHover(target);
         postToParent('ELEMENT_RIGHT_CLICK', getElementInfo(target));
+      }, true);
+
+      document.addEventListener('click', (event) => {
+        const anchor = event.target instanceof Element ? event.target.closest('a[href]') : null;
+        if (!anchor) {
+          return;
+        }
+
+        event.preventDefault();
+        interceptNavigation(anchor.getAttribute('href'));
       }, true);
 
       document.addEventListener('submit', (event) => {
@@ -296,7 +210,7 @@ function buildInjectedScript() {
           return;
         }
 
-        blockDefaultNavigation(event, form);
+        event.preventDefault();
         const formData = new FormData(form);
         const method = (form.getAttribute('method') || 'GET').toUpperCase();
         const action = form.getAttribute('action') || window.location.href;
@@ -333,24 +247,6 @@ function buildInjectedScript() {
         }
         return nativeAnchorClick.apply(this, arguments);
       };
-
-      if (window.EventTarget && window.EventTarget.prototype && window.EventTarget.prototype.dispatchEvent) {
-        const nativeDispatchEvent = window.EventTarget.prototype.dispatchEvent;
-        window.EventTarget.prototype.dispatchEvent = function (event) {
-          if (
-            event &&
-            (event.type === 'click' || event.type === 'dblclick' || event.type === 'auxclick') &&
-            this instanceof HTMLAnchorElement
-          ) {
-            if (this.href) {
-              interceptNavigation(this.href);
-            }
-            return true;
-          }
-          return nativeDispatchEvent.call(this, event);
-        };
-      }
-
 
       const originalPushState = history.pushState;
       history.pushState = function () {

@@ -15,15 +15,10 @@
       --accent: #4aa3ff;
       --accent-hover: #2c8ff5;
       --success: #63d2a1;
-      --danger: #ff7676;
       --code-bg: #0f1320;
     }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       height: 100vh;
@@ -48,22 +43,9 @@
       backdrop-filter: blur(8px);
     }
 
-    .toolbar-group {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .toolbar-group.grow {
-      flex: 1;
-      min-width: 320px;
-    }
-
-    label {
-      color: var(--muted);
-      font-size: 13px;
-      white-space: nowrap;
-    }
+    .toolbar-group { display: flex; align-items: center; gap: 8px; }
+    .toolbar-group.grow { flex: 1; min-width: 320px; }
+    label { color: var(--muted); font-size: 13px; white-space: nowrap; }
 
     input[type="text"] {
       height: 38px;
@@ -80,14 +62,8 @@
       box-shadow: 0 0 0 3px rgba(74, 163, 255, 0.16);
     }
 
-    #urlInput {
-      flex: 1;
-      min-width: 240px;
-    }
-
-    #pageNameInput {
-      width: 180px;
-    }
+    #urlInput { flex: 1; min-width: 240px; }
+    #pageNameInput { width: 180px; }
 
     button {
       height: 38px;
@@ -98,42 +74,17 @@
       color: #fff;
       cursor: pointer;
       font-size: 13px;
-      transition: background 0.15s ease, transform 0.15s ease;
+      transition: background 0.15s ease;
     }
 
-    button:hover {
-      background: var(--accent-hover);
-    }
+    button:hover { background: var(--accent-hover); }
+    button:disabled { background: #5c6478; cursor: not-allowed; }
+    button.secondary { background: #31384a; }
+    button.secondary:hover { background: #3a4258; }
+    button.export { background: var(--success); color: #102218; font-weight: 700; }
+    button.export:hover { background: #49c892; }
 
-    button:disabled {
-      background: #5c6478;
-      cursor: not-allowed;
-      transform: none;
-    }
-
-    button.secondary {
-      background: #31384a;
-    }
-
-    button.secondary:hover {
-      background: #3a4258;
-    }
-
-    button.export {
-      background: var(--success);
-      color: #102218;
-      font-weight: 700;
-    }
-
-    button.export:hover {
-      background: #49c892;
-    }
-
-    .warning {
-      width: 100%;
-      font-size: 12px;
-      color: #f6c46d;
-    }
+    .warning { width: 100%; font-size: 12px; color: #f6c46d; }
 
     .status-bar {
       padding: 8px 18px;
@@ -160,9 +111,7 @@
       background: rgba(31, 36, 48, 0.82);
     }
 
-    .panel:last-child {
-      border-right: none;
-    }
+    .panel:last-child { border-right: none; }
 
     .panel-title {
       display: flex;
@@ -176,11 +125,7 @@
       font-weight: 700;
     }
 
-    .panel-subtitle {
-      font-size: 12px;
-      color: var(--muted);
-      font-weight: 400;
-    }
+    .panel-subtitle { font-size: 12px; color: var(--muted); font-weight: 400; }
 
     .panel-content {
       flex: 1;
@@ -190,7 +135,6 @@
     }
 
     .frame-wrap {
-      position: relative;
       height: 100%;
       border: 1px solid var(--border);
       border-radius: 10px;
@@ -198,40 +142,7 @@
       background: #fff;
     }
 
-    #target-frame {
-      width: 100%;
-      height: 100%;
-      border: none;
-      background: #fff;
-    }
-
-    .frame-interceptor {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 14px;
-      bottom: 14px;
-      z-index: 3;
-      background: transparent;
-      cursor: crosshair;
-      user-select: none;
-      -webkit-user-select: none;
-      touch-action: none;
-    }
-
-    .frame-interceptor.browse-mode {
-      pointer-events: none;
-      cursor: default;
-    }
-
-    .frame-highlight {
-      position: absolute;
-      z-index: 4;
-      border: 2px solid #ff4d6d;
-      background: rgba(255, 77, 109, 0.12);
-      pointer-events: none;
-      display: none;
-    }
+    #target-frame { width: 100%; height: 100%; border: none; background: #fff; }
 
     .placeholder {
       padding: 48px 18px;
@@ -248,15 +159,12 @@
       border-radius: 10px;
     }
 
-    .info-label {
-      margin-bottom: 6px;
-      font-size: 11px;
-      color: var(--muted);
-      letter-spacing: 0.04em;
-    }
+    .info-label { margin-bottom: 6px; font-size: 11px; color: var(--muted); letter-spacing: 0.04em; }
 
     .info-value {
       min-height: 22px;
+      max-height: 120px;
+      overflow: auto;
       padding: 8px 10px;
       border-radius: 8px;
       background: var(--code-bg);
@@ -283,17 +191,8 @@
       margin-bottom: 8px;
     }
 
-    .saved-title {
-      color: var(--success);
-      font-weight: 700;
-      font-size: 14px;
-    }
-
-    .saved-meta {
-      font-size: 12px;
-      color: var(--muted);
-      margin-bottom: 8px;
-    }
+    .saved-title { color: var(--success); font-weight: 700; font-size: 14px; }
+    .saved-meta { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
 
     .saved-json {
       padding: 10px;
@@ -308,18 +207,9 @@
     }
 
     @media (max-width: 1200px) {
-      .main {
-        grid-template-columns: 1fr;
-      }
-
-      .panel {
-        border-right: none;
-        border-bottom: 1px solid var(--border);
-      }
-
-      .panel:last-child {
-        border-bottom: none;
-      }
+      .main { grid-template-columns: 1fr; }
+      .panel { border-right: none; border-bottom: 1px solid var(--border); }
+      .panel:last-child { border-bottom: none; }
     }
   </style>
 </head>
@@ -329,7 +219,6 @@
       <button class="secondary" id="backBtn" onclick="goBack()" disabled>返回</button>
       <button class="secondary" id="forwardBtn" onclick="goForward()" disabled>前进</button>
       <button class="secondary" onclick="reloadCurrent()">刷新</button>
-      <button class="secondary" id="modeBtn" onclick="toggleInteractionMode()">定位模式</button>
     </div>
     <div class="toolbar-group grow">
       <label for="urlInput">目标 URL</label>
@@ -339,7 +228,7 @@
       <button onclick="loadPageFromInput()">加载页面</button>
     </div>
     <button class="export" onclick="exportJSON()">导出 JSON</button>
-    <div class="warning">说明：左键点击可交互元素会在中间列生成定位信息，右键点击可交互元素会保存到右侧定位库，页面跳转会保持在当前视图框内。</div>
+    <div class="warning">说明：鼠标悬停到可交互元素时，中间列实时展示当前元素定位信息；右键点击可交互元素会保存到右侧定位库；左键点击保持页面正常操作，链接跳转仍留在当前视图框内。</div>
   </header>
 
   <div class="status-bar" id="statusBar">当前未加载页面</div>
@@ -352,14 +241,8 @@
       </div>
       <div class="panel-content">
         <div class="frame-wrap">
-          <iframe
-            id="target-frame"
-            title="目标视图"
-            sandbox="allow-same-origin allow-scripts allow-forms"
-            srcdoc="<!DOCTYPE html><html><body style='margin:0;padding:32px;background:#f6f8fc;font-family:PingFang SC,Microsoft YaHei,sans-serif;color:#334155;'><h2 style='margin-bottom:12px;'>等待加载页面</h2><p>输入目标 URL 后点击“加载页面”。</p></body></html>"
-          ></iframe>
-          <div id="frameInterceptor" class="frame-interceptor" title="定位模式：左键查看元素，右键保存元素"></div>
-          <div id="frameHighlight" class="frame-highlight"></div>
+          <iframe id="target-frame" title="目标视图" sandbox="allow-same-origin allow-scripts allow-forms"
+            srcdoc="<!DOCTYPE html><html><body style='margin:0;padding:32px;background:#f6f8fc;font-family:PingFang SC,Microsoft YaHei,sans-serif;color:#334155;'><h2 style='margin-bottom:12px;'>等待加载页面</h2><p>输入目标 URL 后点击“加载页面”。</p></body></html>"></iframe>
         </div>
       </div>
     </section>
@@ -367,10 +250,10 @@
     <section class="panel">
       <div class="panel-title">
         <span>元素定位信息</span>
-        <span class="panel-subtitle">左键选中</span>
+        <span class="panel-subtitle">悬停预览</span>
       </div>
       <div class="panel-content" id="midContent">
-        <div class="placeholder">左键点击左侧页面中的可交互元素后，在这里显示 `id`、`name`、`class`、`xpath` 等定位信息。</div>
+        <div class="placeholder">将鼠标悬停到左侧页面中的可交互元素后，在这里实时显示 `id`、`name`、`class`、`xpath` 等定位信息。</div>
       </div>
     </section>
 
@@ -389,31 +272,41 @@
     const state = {
       currentUrl: '',
       currentPageAlias: '',
-      currentSelected: null,
       currentHovered: null,
-      pointerSession: null,
       navigationHistory: [],
       historyIndex: -1,
-      savedLocators: [],
-      interactionMode: 'inspect'
+      savedLocators: []
     };
 
     const frame = document.getElementById('target-frame');
     const statusBar = document.getElementById('statusBar');
     const frameHint = document.getElementById('frameHint');
-    const frameInterceptor = document.getElementById('frameInterceptor');
-    const frameHighlight = document.getElementById('frameHighlight');
 
     window.addEventListener('message', handleFrameMessage);
     document.addEventListener('DOMContentLoaded', () => {
       renderSavedLibrary();
-      bindFrameInspector();
-      setInteractionMode('inspect');
     });
 
     function handleFrameMessage(event) {
       const { type, payload } = event.data || {};
-      if (!type) {
+      if (!type) return;
+
+      if (type === 'ELEMENT_HOVER') {
+        state.currentHovered = payload;
+        renderSelectedInfo(payload);
+        statusBar.textContent = `当前悬停元素：${payload.elementType || payload.tag || 'element'} | XPath: ${payload.xpath || '无'}`;
+        return;
+      }
+
+      if (type === 'ELEMENT_RIGHT_CLICK') {
+        state.currentHovered = payload;
+        renderSelectedInfo(payload);
+        saveLocator(payload);
+        return;
+      }
+
+      if (type === 'ELEMENT_LEAVE') {
+        state.currentHovered = null;
         return;
       }
 
@@ -468,38 +361,27 @@
       if (frame.hasAttribute('srcdoc')) {
         frame.removeAttribute('srcdoc');
       }
+
       frame.src = `/proxy?url=${encodeURIComponent(normalizedUrl)}`;
       frameHint.textContent = state.currentPageAlias || '当前页面';
       statusBar.textContent = `正在加载：${normalizedUrl}`;
-      clearFrameHighlight();
       updateNavigationButtons();
     }
 
     function goBack() {
-      if (state.historyIndex <= 0) {
-        return;
-      }
-
+      if (state.historyIndex <= 0) return;
       state.historyIndex -= 1;
-      const url = state.navigationHistory[state.historyIndex];
-      navigateToUrl(url, { updateInput: true, pushHistory: false });
+      navigateToUrl(state.navigationHistory[state.historyIndex], { updateInput: true, pushHistory: false });
     }
 
     function goForward() {
-      if (state.historyIndex >= state.navigationHistory.length - 1) {
-        return;
-      }
-
+      if (state.historyIndex >= state.navigationHistory.length - 1) return;
       state.historyIndex += 1;
-      const url = state.navigationHistory[state.historyIndex];
-      navigateToUrl(url, { updateInput: true, pushHistory: false });
+      navigateToUrl(state.navigationHistory[state.historyIndex], { updateInput: true, pushHistory: false });
     }
 
     function reloadCurrent() {
-      if (!state.currentUrl) {
-        return;
-      }
-
+      if (!state.currentUrl) return;
       navigateToUrl(state.currentUrl, { updateInput: true, pushHistory: false });
     }
 
@@ -530,385 +412,18 @@
       `).join('');
     }
 
-    function bindFrameInspector() {
-      frameInterceptor.addEventListener('mousemove', handleInspectorMove);
-      frameInterceptor.addEventListener('mouseleave', () => {
-        state.currentHovered = null;
-        clearFrameHighlight();
-      });
-      frameInterceptor.addEventListener('wheel', handleInspectorWheel, { passive: false });
-      frameInterceptor.addEventListener('pointerdown', handleInspectorPointerDown);
-      frameInterceptor.addEventListener('pointermove', handleInspectorPointerMove);
-      frameInterceptor.addEventListener('pointerup', handleInspectorPointerUp);
-      frameInterceptor.addEventListener('pointercancel', resetPointerSession);
-      frameInterceptor.addEventListener('click', (event) => {
-        if (state.interactionMode !== 'inspect') {
-          return;
-        }
-
-        event.preventDefault();
-        event.stopPropagation();
-      });
-      frameInterceptor.addEventListener('contextmenu', (event) => {
-        if (state.interactionMode !== 'inspect') {
-          return;
-        }
-
-        event.preventDefault();
-        event.stopPropagation();
-        const info = getElementInfoFromPoint(event);
-        if (!info) {
-          return;
-        }
-
-        state.currentSelected = info;
-        renderSelectedInfo(info);
-        saveLocator(info);
-      });
-    }
-
-    function handleInspectorPointerDown(event) {
-      if (state.interactionMode !== 'inspect' || event.button !== 0) {
-        return;
-      }
-
-      const scrollingElement = getFrameScrollingElement();
-      if (!scrollingElement) {
-        return;
-      }
-
-      event.preventDefault();
-      frameInterceptor.setPointerCapture(event.pointerId);
-      frameInterceptor.style.cursor = 'grabbing';
-      state.pointerSession = {
-        pointerId: event.pointerId,
-        startClientX: event.clientX,
-        startClientY: event.clientY,
-        startScrollLeft: scrollingElement.scrollLeft,
-        startScrollTop: scrollingElement.scrollTop,
-        dragging: false
-      };
-    }
-
-    function handleInspectorPointerMove(event) {
-      if (state.interactionMode !== 'inspect' || !state.pointerSession) {
-        return;
-      }
-
-      if (event.pointerId !== state.pointerSession.pointerId) {
-        return;
-      }
-
-      const win = frame.contentWindow;
-      if (!win) {
-        return;
-      }
-
-      const deltaX = event.clientX - state.pointerSession.startClientX;
-      const deltaY = event.clientY - state.pointerSession.startClientY;
-      if (!state.pointerSession.dragging && Math.abs(deltaX) + Math.abs(deltaY) < 6) {
-        return;
-      }
-
-      state.pointerSession.dragging = true;
-      event.preventDefault();
-
-      win.scrollTo({
-        left: state.pointerSession.startScrollLeft - deltaX,
-        top: state.pointerSession.startScrollTop - deltaY,
-        behavior: 'auto'
-      });
-
-      if (state.currentHovered?.element) {
-        requestAnimationFrame(() => updateFrameHighlight(state.currentHovered.element));
-      }
-    }
-
-    function handleInspectorPointerUp(event) {
-      if (state.interactionMode !== 'inspect' || !state.pointerSession || event.button !== 0) {
-        return;
-      }
-
-      if (event.pointerId !== state.pointerSession.pointerId) {
-        return;
-      }
-
-      event.preventDefault();
-      const session = state.pointerSession;
-      resetPointerSession();
-
-      if (session.dragging) {
-        return;
-      }
-
-      const frameRect = frameInterceptor.getBoundingClientRect();
-      const insideFrame =
-        event.clientX >= frameRect.left &&
-        event.clientX <= frameRect.right &&
-        event.clientY >= frameRect.top &&
-        event.clientY <= frameRect.bottom;
-      if (!insideFrame) {
-        return;
-      }
-
-      const info = getElementInfoFromClientPoint(event.clientX, event.clientY);
-      if (!info) {
-        return;
-      }
-
-      state.currentSelected = info;
-      renderSelectedInfo(info);
-      statusBar.textContent = `已选中元素：${info.elementType} | XPath: ${info.xpath || '无'}`;
-    }
-
-    function resetPointerSession() {
-      state.pointerSession = null;
-      frameInterceptor.style.cursor = state.interactionMode === 'inspect' ? 'crosshair' : 'default';
-    }
-
-    function handleInspectorWheel(event) {
-      if (state.interactionMode !== 'inspect') {
-        return;
-      }
-
-      const win = frame.contentWindow;
-      const scrollingElement = getFrameScrollingElement();
-      if (!scrollingElement || !win) {
-        return;
-      }
-
-      event.preventDefault();
-      event.stopPropagation();
-
-      const nextLeft = scrollingElement.scrollLeft + event.deltaX;
-      const nextTop = scrollingElement.scrollTop + event.deltaY;
-      win.scrollTo({
-        left: nextLeft,
-        top: nextTop,
-        behavior: 'auto'
-      });
-
-      if (state.currentHovered?.element) {
-        requestAnimationFrame(() => updateFrameHighlight(state.currentHovered.element));
-      }
-    }
-
-    function handleInspectorMove(event) {
-      if (state.interactionMode !== 'inspect') {
-        return;
-      }
-
-      if (state.pointerSession?.dragging) {
-        return;
-      }
-
-      const info = getElementInfoFromPoint(event);
-      if (!info) {
-        state.currentHovered = null;
-        clearFrameHighlight();
-        return;
-      }
-
-      state.currentHovered = info;
-      updateFrameHighlight(info.element);
-    }
-
-    function getElementInfoFromPoint(event) {
-      return getElementInfoFromClientPoint(event.clientX, event.clientY);
-    }
-
-    function getElementInfoFromClientPoint(clientX, clientY) {
-      const doc = frame.contentDocument;
-      if (!doc || !frame.contentWindow) {
-        return null;
-      }
-
-      const rect = frame.getBoundingClientRect();
-      const x = clientX - rect.left;
-      const y = clientY - rect.top;
-      const raw = doc.elementFromPoint(x, y);
-      if (!raw) {
-        return null;
-      }
-
-      const element = getInspectableElement(raw);
-      if (!element) {
-        return null;
-      }
-
-      return buildElementInfo(element);
-    }
-
-    function getFrameScrollingElement() {
-      const doc = frame.contentDocument;
-      return doc?.scrollingElement || doc?.documentElement || doc?.body || null;
-    }
-
-    function getInspectableElement(element) {
-      if (!isDomElement(element)) {
-        return null;
-      }
-
-      const interactiveSelector = [
-        'a[href]',
-        'button',
-        'input',
-        'select',
-        'textarea',
-        '[role="button"]',
-        '[onclick]',
-        '[tabindex]'
-      ].join(',');
-
-      return element.matches(interactiveSelector) ? element : element.closest(interactiveSelector) || element;
-    }
-
-    function isDomElement(value) {
-      return !!value && value.nodeType === 1 && typeof value.matches === 'function';
-    }
-
-    function buildElementInfo(element) {
-      return {
-        element,
-        elementName: '',
-        elementType: getElementType(element),
-        tag: element.tagName.toLowerCase(),
-        id: element.id || '',
-        class: typeof element.className === 'string' ? element.className.trim() : '',
-        name: element.getAttribute('name') || '',
-        xpath: getXPath(element),
-        css: getCssSelector(element),
-        text: (element.innerText || element.value || element.textContent || '').trim().slice(0, 80)
-      };
-    }
-
-    function getElementType(element) {
-      const tag = element.tagName.toLowerCase();
-      if (tag === 'a') return 'link';
-      if (tag === 'button') return 'button';
-      if (tag === 'select') return 'select';
-      if (tag === 'textarea') return 'textarea';
-      if (tag === 'input') return element.type ? `input-${element.type.toLowerCase()}` : 'input-text';
-      return tag;
-    }
-
-    function getXPath(element) {
-      if (!element || element.nodeType !== Node.ELEMENT_NODE) {
-        return '';
-      }
-
-      if (element.id) {
-        return `//*[@id="${element.id}"]`;
-      }
-
-      const segments = [];
-      let current = element;
-      while (current && current.nodeType === Node.ELEMENT_NODE) {
-        let index = 1;
-        let previous = current.previousElementSibling;
-        while (previous) {
-          if (previous.tagName === current.tagName) {
-            index += 1;
-          }
-          previous = previous.previousElementSibling;
-        }
-        segments.unshift(`${current.tagName.toLowerCase()}[${index}]`);
-        current = current.parentElement;
-      }
-      return `/${segments.join('/')}`;
-    }
-
-    function getCssSelector(element) {
-      if (!element || element.nodeType !== Node.ELEMENT_NODE) {
-        return '';
-      }
-
-      if (element.id) {
-        return `#${cssEscape(element.id)}`;
-      }
-
-      const parts = [];
-      let current = element;
-      while (current && current.nodeType === Node.ELEMENT_NODE) {
-        let part = current.tagName.toLowerCase();
-        if (current.classList.length > 0) {
-          part += `.${cssEscape(current.classList[0])}`;
-        }
-        const parent = current.parentElement;
-        if (parent) {
-          const siblings = Array.from(parent.children).filter((child) => child.tagName === current.tagName);
-          if (siblings.length > 1) {
-            part += `:nth-of-type(${siblings.indexOf(current) + 1})`;
-          }
-        }
-        parts.unshift(part);
-        current = parent;
-      }
-      return parts.join(' > ');
-    }
-
-    function cssEscape(value) {
-      if (window.CSS && typeof window.CSS.escape === 'function') {
-        return window.CSS.escape(value);
-      }
-      return String(value).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
-    }
-
-    function updateFrameHighlight(element) {
-      if (!element || !frame.contentWindow) {
-        clearFrameHighlight();
-        return;
-      }
-
-      const rect = element.getBoundingClientRect();
-      frameHighlight.style.display = 'block';
-      frameHighlight.style.left = `${rect.left}px`;
-      frameHighlight.style.top = `${rect.top}px`;
-      frameHighlight.style.width = `${Math.max(rect.width, 1)}px`;
-      frameHighlight.style.height = `${Math.max(rect.height, 1)}px`;
-    }
-
-    function clearFrameHighlight() {
-      frameHighlight.style.display = 'none';
-    }
-
-    function toggleInteractionMode() {
-      setInteractionMode(state.interactionMode === 'inspect' ? 'browse' : 'inspect');
-    }
-
-    function setInteractionMode(mode) {
-      state.interactionMode = mode;
-      resetPointerSession();
-      const inspectMode = mode === 'inspect';
-      frameInterceptor.classList.toggle('browse-mode', !inspectMode);
-      document.getElementById('modeBtn').textContent = inspectMode ? '定位模式' : '浏览模式';
-      frameInterceptor.title = inspectMode
-        ? '定位模式：左键查看元素，右键保存元素'
-        : '浏览模式：可直接操作页面';
-      if (inspectMode) {
-        statusBar.textContent = state.currentUrl
-          ? `定位模式已开启：左键查看元素，右键保存元素`
-          : '当前未加载页面';
-      } else {
-        clearFrameHighlight();
-        statusBar.textContent = '浏览模式已开启：点击目标页面会执行真实交互';
-      }
-    }
-
     function saveLocator(info) {
       const defaultName = buildDefaultElementName(info);
       const elementName = window.prompt('请输入元素名称：', defaultName);
-      if (elementName === null) {
-        return;
-      }
+      if (elementName === null) return;
 
       const savedItem = {
-        "元素名称": elementName.trim() || defaultName,
-        "元素类型": info.elementType || info.tag || '',
-        "id": info.id || '',
-        "class": info.class || '',
-        "name": info.name || '',
-        "xpath": info.xpath || ''
+        '元素名称': elementName.trim() || defaultName,
+        '元素类型': info.elementType || info.tag || '',
+        'id': info.id || '',
+        'class': info.class || '',
+        'name': info.name || '',
+        'xpath': info.xpath || ''
       };
 
       state.savedLocators.push({
@@ -918,7 +433,7 @@
       });
 
       renderSavedLibrary();
-      statusBar.textContent = `已保存元素：${savedItem["元素名称"]}`;
+      statusBar.textContent = `已保存元素：${savedItem['元素名称']}`;
     }
 
     function renderSavedLibrary() {
