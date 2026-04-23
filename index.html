@@ -152,6 +152,7 @@
 
     .panel {
       min-width: 0;
+      min-height: 0;
       display: flex;
       flex-direction: column;
       padding: 12px;
@@ -185,6 +186,7 @@
       flex: 1;
       min-height: 0;
       overflow: auto;
+      scrollbar-gutter: stable;
     }
 
     .frame-wrap {
@@ -205,10 +207,16 @@
 
     .frame-interceptor {
       position: absolute;
-      inset: 0;
+      top: 0;
+      left: 0;
+      right: 14px;
+      bottom: 14px;
       z-index: 3;
       background: transparent;
       cursor: crosshair;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
     }
 
     .frame-interceptor.browse-mode {
@@ -383,6 +391,7 @@
       currentPageAlias: '',
       currentSelected: null,
       currentHovered: null,
+      pointerSession: null,
       navigationHistory: [],
       historyIndex: -1,
       savedLocators: [],
@@ -527,6 +536,11 @@
         state.currentHovered = null;
         clearFrameHighlight();
       });
+      frameInterceptor.addEventListener('wheel', handleInspectorWheel, { passive: false });
+      frameInterceptor.addEventListener('pointerdown', handleInspectorPointerDown);
+      frameInterceptor.addEventListener('pointermove', handleInspectorPointerMove);
+      frameInterceptor.addEventListener('pointerup', handleInspectorPointerUp);
+      frameInterceptor.addEventListener('pointercancel', resetPointerSession);
       frameInterceptor.addEventListener('click', (event) => {
         if (state.interactionMode !== 'inspect') {
           return;
@@ -534,14 +548,6 @@
 
         event.preventDefault();
         event.stopPropagation();
-        const info = getElementInfoFromPoint(event);
-        if (!info) {
-          return;
-        }
-
-        state.currentSelected = info;
-        renderSelectedInfo(info);
-        statusBar.textContent = `已选中元素：${info.elementType} | XPath: ${info.xpath || '无'}`;
       });
       frameInterceptor.addEventListener('contextmenu', (event) => {
         if (state.interactionMode !== 'inspect') {
@@ -561,8 +567,138 @@
       });
     }
 
+    function handleInspectorPointerDown(event) {
+      if (state.interactionMode !== 'inspect' || event.button !== 0) {
+        return;
+      }
+
+      const scrollingElement = getFrameScrollingElement();
+      if (!scrollingElement) {
+        return;
+      }
+
+      event.preventDefault();
+      frameInterceptor.setPointerCapture(event.pointerId);
+      frameInterceptor.style.cursor = 'grabbing';
+      state.pointerSession = {
+        pointerId: event.pointerId,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        startScrollLeft: scrollingElement.scrollLeft,
+        startScrollTop: scrollingElement.scrollTop,
+        dragging: false
+      };
+    }
+
+    function handleInspectorPointerMove(event) {
+      if (state.interactionMode !== 'inspect' || !state.pointerSession) {
+        return;
+      }
+
+      if (event.pointerId !== state.pointerSession.pointerId) {
+        return;
+      }
+
+      const win = frame.contentWindow;
+      if (!win) {
+        return;
+      }
+
+      const deltaX = event.clientX - state.pointerSession.startClientX;
+      const deltaY = event.clientY - state.pointerSession.startClientY;
+      if (!state.pointerSession.dragging && Math.abs(deltaX) + Math.abs(deltaY) < 6) {
+        return;
+      }
+
+      state.pointerSession.dragging = true;
+      event.preventDefault();
+
+      win.scrollTo({
+        left: state.pointerSession.startScrollLeft - deltaX,
+        top: state.pointerSession.startScrollTop - deltaY,
+        behavior: 'auto'
+      });
+
+      if (state.currentHovered?.element) {
+        requestAnimationFrame(() => updateFrameHighlight(state.currentHovered.element));
+      }
+    }
+
+    function handleInspectorPointerUp(event) {
+      if (state.interactionMode !== 'inspect' || !state.pointerSession || event.button !== 0) {
+        return;
+      }
+
+      if (event.pointerId !== state.pointerSession.pointerId) {
+        return;
+      }
+
+      event.preventDefault();
+      const session = state.pointerSession;
+      resetPointerSession();
+
+      if (session.dragging) {
+        return;
+      }
+
+      const frameRect = frameInterceptor.getBoundingClientRect();
+      const insideFrame =
+        event.clientX >= frameRect.left &&
+        event.clientX <= frameRect.right &&
+        event.clientY >= frameRect.top &&
+        event.clientY <= frameRect.bottom;
+      if (!insideFrame) {
+        return;
+      }
+
+      const info = getElementInfoFromClientPoint(event.clientX, event.clientY);
+      if (!info) {
+        return;
+      }
+
+      state.currentSelected = info;
+      renderSelectedInfo(info);
+      statusBar.textContent = `已选中元素：${info.elementType} | XPath: ${info.xpath || '无'}`;
+    }
+
+    function resetPointerSession() {
+      state.pointerSession = null;
+      frameInterceptor.style.cursor = state.interactionMode === 'inspect' ? 'crosshair' : 'default';
+    }
+
+    function handleInspectorWheel(event) {
+      if (state.interactionMode !== 'inspect') {
+        return;
+      }
+
+      const win = frame.contentWindow;
+      const scrollingElement = getFrameScrollingElement();
+      if (!scrollingElement || !win) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const nextLeft = scrollingElement.scrollLeft + event.deltaX;
+      const nextTop = scrollingElement.scrollTop + event.deltaY;
+      win.scrollTo({
+        left: nextLeft,
+        top: nextTop,
+        behavior: 'auto'
+      });
+
+      if (state.currentHovered?.element) {
+        requestAnimationFrame(() => updateFrameHighlight(state.currentHovered.element));
+      }
+    }
+
     function handleInspectorMove(event) {
       if (state.interactionMode !== 'inspect') {
+        return;
+      }
+
+      if (state.pointerSession?.dragging) {
         return;
       }
 
@@ -578,15 +714,18 @@
     }
 
     function getElementInfoFromPoint(event) {
+      return getElementInfoFromClientPoint(event.clientX, event.clientY);
+    }
+
+    function getElementInfoFromClientPoint(clientX, clientY) {
       const doc = frame.contentDocument;
-      const win = frame.contentWindow;
-      if (!doc || !win) {
+      if (!doc || !frame.contentWindow) {
         return null;
       }
 
       const rect = frame.getBoundingClientRect();
-      const x = event.clientX - rect.left;
-      const y = event.clientY - rect.top;
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
       const raw = doc.elementFromPoint(x, y);
       if (!raw) {
         return null;
@@ -598,6 +737,11 @@
       }
 
       return buildElementInfo(element);
+    }
+
+    function getFrameScrollingElement() {
+      const doc = frame.contentDocument;
+      return doc?.scrollingElement || doc?.documentElement || doc?.body || null;
     }
 
     function getInspectableElement(element) {
@@ -734,6 +878,7 @@
 
     function setInteractionMode(mode) {
       state.interactionMode = mode;
+      resetPointerSession();
       const inspectMode = mode === 'inspect';
       frameInterceptor.classList.toggle('browse-mode', !inspectMode);
       document.getElementById('modeBtn').textContent = inspectMode ? '定位模式' : '浏览模式';
