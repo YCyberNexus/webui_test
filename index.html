@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>页面元素定位工具</title>
+  <style>
+    :root {
+      --bg: #151821;
+      --panel: #1f2430;
+      --panel-alt: #252b39;
+      --border: #394050;
+      --text: #eef2ff;
+      --muted: #9da7c2;
+      --accent: #4aa3ff;
+      --accent-hover: #2c8ff5;
+      --success: #63d2a1;
+      --danger: #ff7676;
+      --code-bg: #0f1320;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      height: 100vh;
+      overflow: hidden;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(74, 163, 255, 0.18), transparent 30%),
+        linear-gradient(180deg, #121622 0%, #0f121a 100%);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      padding: 14px 18px;
+      background: rgba(31, 36, 48, 0.96);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(8px);
+    }
+
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toolbar-group.grow {
+      flex: 1;
+      min-width: 320px;
+    }
+
+    label {
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    input[type="text"] {
+      height: 38px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(12, 16, 24, 0.88);
+      color: var(--text);
+      padding: 0 12px;
+      outline: none;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(74, 163, 255, 0.16);
+    }
+
+    #urlInput {
+      flex: 1;
+      min-width: 240px;
+    }
+
+    #pageNameInput {
+      width: 180px;
+    }
+
+    button {
+      height: 38px;
+      padding: 0 14px;
+      border: none;
+      border-radius: 8px;
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+      font-size: 13px;
+      transition: background 0.15s ease, transform 0.15s ease;
+    }
+
+    button:hover {
+      background: var(--accent-hover);
+    }
+
+    button:disabled {
+      background: #5c6478;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    button.secondary {
+      background: #31384a;
+    }
+
+    button.secondary:hover {
+      background: #3a4258;
+    }
+
+    button.export {
+      background: var(--success);
+      color: #102218;
+      font-weight: 700;
+    }
+
+    button.export:hover {
+      background: #49c892;
+    }
+
+    .warning {
+      width: 100%;
+      font-size: 12px;
+      color: #f6c46d;
+    }
+
+    .status-bar {
+      padding: 8px 18px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(18, 22, 34, 0.92);
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .main {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 2.1fr) minmax(320px, 1fr) minmax(340px, 1.1fr);
+    }
+
+    .panel {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 12px;
+      border-right: 1px solid var(--border);
+      background: rgba(31, 36, 48, 0.82);
+    }
+
+    .panel:last-child {
+      border-right: none;
+    }
+
+    .panel-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px dashed var(--border);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .panel-subtitle {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 400;
+    }
+
+    .panel-content {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+    }
+
+    .frame-wrap {
+      position: relative;
+      height: 100%;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    #target-frame {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #fff;
+    }
+
+    .frame-interceptor {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      background: transparent;
+      cursor: crosshair;
+    }
+
+    .frame-interceptor.browse-mode {
+      pointer-events: none;
+      cursor: default;
+    }
+
+    .frame-highlight {
+      position: absolute;
+      z-index: 4;
+      border: 2px solid #ff4d6d;
+      background: rgba(255, 77, 109, 0.12);
+      pointer-events: none;
+      display: none;
+    }
+
+    .placeholder {
+      padding: 48px 18px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .info-card {
+      margin-bottom: 10px;
+      padding: 12px;
+      background: var(--panel-alt);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+
+    .info-label {
+      margin-bottom: 6px;
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+
+    .info-value {
+      min-height: 22px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: var(--code-bg);
+      color: #94c7ff;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .saved-item {
+      margin-bottom: 12px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--panel-alt);
+    }
+
+    .saved-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .saved-title {
+      color: var(--success);
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .saved-meta {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .saved-json {
+      padding: 10px;
+      border-radius: 8px;
+      background: var(--code-bg);
+      color: #c8d4ff;
+      font-size: 12px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: "SFMono-Regular", Consolas, monospace;
+    }
+
+    @media (max-width: 1200px) {
+      .main {
+        grid-template-columns: 1fr;
+      }
+
+      .panel {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .panel:last-child {
+        border-bottom: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="toolbar-group">
+      <button class="secondary" id="backBtn" onclick="goBack()" disabled>返回</button>
+      <button class="secondary" id="forwardBtn" onclick="goForward()" disabled>前进</button>
+      <button class="secondary" onclick="reloadCurrent()">刷新</button>
+      <button class="secondary" id="modeBtn" onclick="toggleInteractionMode()">定位模式</button>
+    </div>
+    <div class="toolbar-group grow">
+      <label for="urlInput">目标 URL</label>
+      <input type="text" id="urlInput" placeholder="https://example.com">
+      <label for="pageNameInput">页面别名</label>
+      <input type="text" id="pageNameInput" placeholder="如：登录页">
+      <button onclick="loadPageFromInput()">加载页面</button>
+    </div>
+    <button class="export" onclick="exportJSON()">导出 JSON</button>
+    <div class="warning">说明：左键点击可交互元素会在中间列生成定位信息，右键点击可交互元素会保存到右侧定位库，页面跳转会保持在当前视图框内。</div>
+  </header>
+
+  <div class="status-bar" id="statusBar">当前未加载页面</div>
+
+  <div class="main">
+    <section class="panel">
+      <div class="panel-title">
+        <span>目标页面视图</span>
+        <span class="panel-subtitle" id="frameHint">请先输入 URL 并加载</span>
+      </div>
+      <div class="panel-content">
+        <div class="frame-wrap">
+          <iframe
+            id="target-frame"
+            title="目标视图"
+            sandbox="allow-same-origin allow-scripts allow-forms"
+            srcdoc="<!DOCTYPE html><html><body style='margin:0;padding:32px;background:#f6f8fc;font-family:PingFang SC,Microsoft YaHei,sans-serif;color:#334155;'><h2 style='margin-bottom:12px;'>等待加载页面</h2><p>输入目标 URL 后点击“加载页面”。</p></body></html>"
+          ></iframe>
+          <div id="frameInterceptor" class="frame-interceptor" title="定位模式：左键查看元素，右键保存元素"></div>
+          <div id="frameHighlight" class="frame-highlight"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-title">
+        <span>元素定位信息</span>
+        <span class="panel-subtitle">左键选中</span>
+      </div>
+      <div class="panel-content" id="midContent">
+        <div class="placeholder">左键点击左侧页面中的可交互元素后，在这里显示 `id`、`name`、`class`、`xpath` 等定位信息。</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-title">
+        <span>已保存定位库</span>
+        <span class="panel-subtitle">右键保存</span>
+      </div>
+      <div class="panel-content" id="rightContent">
+        <div class="placeholder">右键点击可交互元素后，会按 JSON 结构保存到这里。</div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const state = {
+      currentUrl: '',
+      currentPageAlias: '',
+      currentSelected: null,
+      currentHovered: null,
+      navigationHistory: [],
+      historyIndex: -1,
+      savedLocators: [],
+      interactionMode: 'inspect'
+    };
+
+    const frame = document.getElementById('target-frame');
+    const statusBar = document.getElementById('statusBar');
+    const frameHint = document.getElementById('frameHint');
+    const frameInterceptor = document.getElementById('frameInterceptor');
+    const frameHighlight = document.getElementById('frameHighlight');
+
+    window.addEventListener('message', handleFrameMessage);
+    document.addEventListener('DOMContentLoaded', () => {
+      renderSavedLibrary();
+      bindFrameInspector();
+      setInteractionMode('inspect');
+    });
+
+    function handleFrameMessage(event) {
+      const { type, payload } = event.data || {};
+      if (!type) {
+        return;
+      }
+
+      if (type === 'NAVIGATE_TO_URL' && payload?.url) {
+        navigateToUrl(payload.url, { updateInput: true, pushHistory: true });
+      }
+    }
+
+    function loadPageFromInput() {
+      const rawUrl = document.getElementById('urlInput').value.trim();
+      if (!rawUrl) {
+        alert('请输入有效的 URL');
+        return;
+      }
+
+      const normalizedUrl = normalizeUrl(rawUrl);
+      if (!normalizedUrl) {
+        alert('URL 格式不正确');
+        return;
+      }
+
+      if (!document.getElementById('pageNameInput').value.trim()) {
+        document.getElementById('pageNameInput').value = suggestPageAlias(normalizedUrl);
+      }
+
+      navigateToUrl(normalizedUrl, { updateInput: true, pushHistory: true });
+    }
+
+    function navigateToUrl(url, options = {}) {
+      const { updateInput = false, pushHistory = false } = options;
+      const normalizedUrl = normalizeUrl(url);
+      if (!normalizedUrl) {
+        alert('无法跳转到无效 URL');
+        return;
+      }
+
+      state.currentUrl = normalizedUrl;
+      state.currentPageAlias = document.getElementById('pageNameInput').value.trim() || suggestPageAlias(normalizedUrl);
+
+      if (updateInput) {
+        document.getElementById('urlInput').value = normalizedUrl;
+      }
+
+      if (pushHistory) {
+        if (state.navigationHistory[state.historyIndex] !== normalizedUrl) {
+          state.navigationHistory = state.navigationHistory.slice(0, state.historyIndex + 1);
+          state.navigationHistory.push(normalizedUrl);
+          state.historyIndex = state.navigationHistory.length - 1;
+        }
+      }
+
+      if (frame.hasAttribute('srcdoc')) {
+        frame.removeAttribute('srcdoc');
+      }
+      frame.src = `/proxy?url=${encodeURIComponent(normalizedUrl)}`;
+      frameHint.textContent = state.currentPageAlias || '当前页面';
+      statusBar.textContent = `正在加载：${normalizedUrl}`;
+      clearFrameHighlight();
+      updateNavigationButtons();
+    }
+
+    function goBack() {
+      if (state.historyIndex <= 0) {
+        return;
+      }
+
+      state.historyIndex -= 1;
+      const url = state.navigationHistory[state.historyIndex];
+      navigateToUrl(url, { updateInput: true, pushHistory: false });
+    }
+
+    function goForward() {
+      if (state.historyIndex >= state.navigationHistory.length - 1) {
+        return;
+      }
+
+      state.historyIndex += 1;
+      const url = state.navigationHistory[state.historyIndex];
+      navigateToUrl(url, { updateInput: true, pushHistory: false });
+    }
+
+    function reloadCurrent() {
+      if (!state.currentUrl) {
+        return;
+      }
+
+      navigateToUrl(state.currentUrl, { updateInput: true, pushHistory: false });
+    }
+
+    function updateNavigationButtons() {
+      document.getElementById('backBtn').disabled = state.historyIndex <= 0;
+      document.getElementById('forwardBtn').disabled = state.historyIndex >= state.navigationHistory.length - 1;
+    }
+
+    function renderSelectedInfo(info) {
+      const values = [
+        ['元素名称', info.elementName || ''],
+        ['元素类型', info.elementType || ''],
+        ['标签', info.tag || ''],
+        ['ID', info.id || ''],
+        ['Class', info.class || ''],
+        ['Name', info.name || ''],
+        ['XPath', info.xpath || ''],
+        ['CSS Selector', info.css || ''],
+        ['文本预览', info.text || '']
+      ];
+
+      document.getElementById('midContent').innerHTML = values.map(([label, value], index) => `
+        <div class="info-card">
+          <div class="info-label">${label}</div>
+          <div class="info-value" id="info-${index}">${escapeHtml(String(value || ''))}</div>
+          <button class="secondary" style="margin-top:8px;" onclick="copyText('info-${index}')">复制</button>
+        </div>
+      `).join('');
+    }
+
+    function bindFrameInspector() {
+      frameInterceptor.addEventListener('mousemove', handleInspectorMove);
+      frameInterceptor.addEventListener('mouseleave', () => {
+        state.currentHovered = null;
+        clearFrameHighlight();
+      });
+      frameInterceptor.addEventListener('click', (event) => {
+        if (state.interactionMode !== 'inspect') {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        const info = getElementInfoFromPoint(event);
+        if (!info) {
+          return;
+        }
+
+        state.currentSelected = info;
+        renderSelectedInfo(info);
+        statusBar.textContent = `已选中元素：${info.elementType} | XPath: ${info.xpath || '无'}`;
+      });
+      frameInterceptor.addEventListener('contextmenu', (event) => {
+        if (state.interactionMode !== 'inspect') {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        const info = getElementInfoFromPoint(event);
+        if (!info) {
+          return;
+        }
+
+        state.currentSelected = info;
+        renderSelectedInfo(info);
+        saveLocator(info);
+      });
+    }
+
+    function handleInspectorMove(event) {
+      if (state.interactionMode !== 'inspect') {
+        return;
+      }
+
+      const info = getElementInfoFromPoint(event);
+      if (!info) {
+        state.currentHovered = null;
+        clearFrameHighlight();
+        return;
+      }
+
+      state.currentHovered = info;
+      updateFrameHighlight(info.element);
+    }
+
+    function getElementInfoFromPoint(event) {
+      const doc = frame.contentDocument;
+      const win = frame.contentWindow;
+      if (!doc || !win) {
+        return null;
+      }
+
+      const rect = frame.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      const raw = doc.elementFromPoint(x, y);
+      if (!raw) {
+        return null;
+      }
+
+      const element = getInspectableElement(raw);
+      if (!element) {
+        return null;
+      }
+
+      return buildElementInfo(element);
+    }
+
+    function getInspectableElement(element) {
+      if (!isDomElement(element)) {
+        return null;
+      }
+
+      const interactiveSelector = [
+        'a[href]',
+        'button',
+        'input',
+        'select',
+        'textarea',
+        '[role="button"]',
+        '[onclick]',
+        '[tabindex]'
+      ].join(',');
+
+      return element.matches(interactiveSelector) ? element : element.closest(interactiveSelector) || element;
+    }
+
+    function isDomElement(value) {
+      return !!value && value.nodeType === 1 && typeof value.matches === 'function';
+    }
+
+    function buildElementInfo(element) {
+      return {
+        element,
+        elementName: '',
+        elementType: getElementType(element),
+        tag: element.tagName.toLowerCase(),
+        id: element.id || '',
+        class: typeof element.className === 'string' ? element.className.trim() : '',
+        name: element.getAttribute('name') || '',
+        xpath: getXPath(element),
+        css: getCssSelector(element),
+        text: (element.innerText || element.value || element.textContent || '').trim().slice(0, 80)
+      };
+    }
+
+    function getElementType(element) {
+      const tag = element.tagName.toLowerCase();
+      if (tag === 'a') return 'link';
+      if (tag === 'button') return 'button';
+      if (tag === 'select') return 'select';
+      if (tag === 'textarea') return 'textarea';
+      if (tag === 'input') return element.type ? `input-${element.type.toLowerCase()}` : 'input-text';
+      return tag;
+    }
+
+    function getXPath(element) {
+      if (!element || element.nodeType !== Node.ELEMENT_NODE) {
+        return '';
+      }
+
+      if (element.id) {
+        return `//*[@id="${element.id}"]`;
+      }
+
+      const segments = [];
+      let current = element;
+      while (current && current.nodeType === Node.ELEMENT_NODE) {
+        let index = 1;
+        let previous = current.previousElementSibling;
+        while (previous) {
+          if (previous.tagName === current.tagName) {
+            index += 1;
+          }
+          previous = previous.previousElementSibling;
+        }
+        segments.unshift(`${current.tagName.toLowerCase()}[${index}]`);
+        current = current.parentElement;
+      }
+      return `/${segments.join('/')}`;
+    }
+
+    function getCssSelector(element) {
+      if (!element || element.nodeType !== Node.ELEMENT_NODE) {
+        return '';
+      }
+
+      if (element.id) {
+        return `#${cssEscape(element.id)}`;
+      }
+
+      const parts = [];
+      let current = element;
+      while (current && current.nodeType === Node.ELEMENT_NODE) {
+        let part = current.tagName.toLowerCase();
+        if (current.classList.length > 0) {
+          part += `.${cssEscape(current.classList[0])}`;
+        }
+        const parent = current.parentElement;
+        if (parent) {
+          const siblings = Array.from(parent.children).filter((child) => child.tagName === current.tagName);
+          if (siblings.length > 1) {
+            part += `:nth-of-type(${siblings.indexOf(current) + 1})`;
+          }
+        }
+        parts.unshift(part);
+        current = parent;
+      }
+      return parts.join(' > ');
+    }
+
+    function cssEscape(value) {
+      if (window.CSS && typeof window.CSS.escape === 'function') {
+        return window.CSS.escape(value);
+      }
+      return String(value).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
+    }
+
+    function updateFrameHighlight(element) {
+      if (!element || !frame.contentWindow) {
+        clearFrameHighlight();
+        return;
+      }
+
+      const rect = element.getBoundingClientRect();
+      frameHighlight.style.display = 'block';
+      frameHighlight.style.left = `${rect.left}px`;
+      frameHighlight.style.top = `${rect.top}px`;
+      frameHighlight.style.width = `${Math.max(rect.width, 1)}px`;
+      frameHighlight.style.height = `${Math.max(rect.height, 1)}px`;
+    }
+
+    function clearFrameHighlight() {
+      frameHighlight.style.display = 'none';
+    }
+
+    function toggleInteractionMode() {
+      setInteractionMode(state.interactionMode === 'inspect' ? 'browse' : 'inspect');
+    }
+
+    function setInteractionMode(mode) {
+      state.interactionMode = mode;
+      const inspectMode = mode === 'inspect';
+      frameInterceptor.classList.toggle('browse-mode', !inspectMode);
+      document.getElementById('modeBtn').textContent = inspectMode ? '定位模式' : '浏览模式';
+      frameInterceptor.title = inspectMode
+        ? '定位模式：左键查看元素，右键保存元素'
+        : '浏览模式：可直接操作页面';
+      if (inspectMode) {
+        statusBar.textContent = state.currentUrl
+          ? `定位模式已开启：左键查看元素，右键保存元素`
+          : '当前未加载页面';
+      } else {
+        clearFrameHighlight();
+        statusBar.textContent = '浏览模式已开启：点击目标页面会执行真实交互';
+      }
+    }
+
+    function saveLocator(info) {
+      const defaultName = buildDefaultElementName(info);
+      const elementName = window.prompt('请输入元素名称：', defaultName);
+      if (elementName === null) {
+        return;
+      }
+
+      const savedItem = {
+        "元素名称": elementName.trim() || defaultName,
+        "元素类型": info.elementType || info.tag || '',
+        "id": info.id || '',
+        "class": info.class || '',
+        "name": info.name || '',
+        "xpath": info.xpath || ''
+      };
+
+      state.savedLocators.push({
+        pageAlias: document.getElementById('pageNameInput').value.trim() || state.currentPageAlias || '',
+        pageUrl: state.currentUrl || '',
+        data: savedItem
+      });
+
+      renderSavedLibrary();
+      statusBar.textContent = `已保存元素：${savedItem["元素名称"]}`;
+    }
+
+    function renderSavedLibrary() {
+      const container = document.getElementById('rightContent');
+      if (state.savedLocators.length === 0) {
+        container.innerHTML = '<div class="placeholder">右键点击可交互元素后，会按 JSON 结构保存到这里。</div>';
+        return;
+      }
+
+      container.innerHTML = state.savedLocators.map((item, index) => `
+        <div class="saved-item">
+          <div class="saved-item-header">
+            <div class="saved-title">${escapeHtml(item.data['元素名称'])}</div>
+            <button onclick="deleteSavedItem(${index})">删除</button>
+          </div>
+          <div class="saved-meta">页面别名：${escapeHtml(item.pageAlias || '未命名页面')}</div>
+          <div class="saved-meta">页面 URL：${escapeHtml(item.pageUrl || '')}</div>
+          <pre class="saved-json">${escapeHtml(JSON.stringify(item.data, null, 2))}</pre>
+        </div>
+      `).join('');
+    }
+
+    function deleteSavedItem(index) {
+      state.savedLocators.splice(index, 1);
+      renderSavedLibrary();
+    }
+
+    function exportJSON() {
+      if (state.savedLocators.length === 0) {
+        alert('定位库为空，无法导出');
+        return;
+      }
+
+      const payload = state.savedLocators.map((item) => item.data);
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `locator-library-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function copyText(elementId) {
+      const text = document.getElementById(elementId)?.innerText || '';
+      navigator.clipboard.writeText(text).then(() => {
+        statusBar.textContent = '定位信息已复制到剪贴板';
+      });
+    }
+
+    function normalizeUrl(url) {
+      try {
+        const withProtocol = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+        return new URL(withProtocol).href;
+      } catch (error) {
+        return '';
+      }
+    }
+
+    function suggestPageAlias(url) {
+      try {
+        const parsed = new URL(url);
+        const lastSegment = parsed.pathname.split('/').filter(Boolean).pop();
+        return lastSegment || parsed.hostname;
+      } catch (error) {
+        return '页面';
+      }
+    }
+
+    function buildDefaultElementName(info) {
+      const alias = document.getElementById('pageNameInput').value.trim() || state.currentPageAlias || '页面';
+      const tag = info.tag || 'element';
+      const key = info.id || info.name || info.text || tag;
+      return `${alias}_${key}`.replace(/\s+/g, '_').slice(0, 50);
+    }
+
+    function escapeHtml(value) {
+      return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+  </script>
+</body>
+</html>
