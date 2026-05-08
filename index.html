@@ -206,6 +206,50 @@
       font-family: "SFMono-Regular", Consolas, monospace;
     }
 
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 2147483646;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(6, 9, 16, 0.68);
+    }
+
+    .modal-backdrop[hidden] { display: none; }
+
+    .modal-dialog {
+      width: min(460px, 100%);
+      padding: 18px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: 0 18px 54px rgba(0, 0, 0, 0.36);
+    }
+
+    .modal-title {
+      margin-bottom: 14px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      margin-bottom: 12px;
+    }
+
+    .form-field input { width: 100%; }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
     @media (max-width: 1200px) {
       .main { grid-template-columns: 1fr; }
       .panel { border-right: none; border-bottom: 1px solid var(--border); }
@@ -268,6 +312,24 @@
     </section>
   </div>
 
+  <div class="modal-backdrop" id="locatorModal" hidden onclick="handleModalBackdropClick(event)">
+    <form class="modal-dialog" id="locatorForm">
+      <div class="modal-title">保存元素定位</div>
+      <div class="form-field">
+        <label for="locatorNameInput">元素名称</label>
+        <input type="text" id="locatorNameInput" autocomplete="off">
+      </div>
+      <div class="form-field">
+        <label for="locatorOwnerInput">元素归属</label>
+        <input type="text" id="locatorOwnerInput" autocomplete="off">
+      </div>
+      <div class="modal-actions">
+        <button class="secondary" type="button" onclick="closeLocatorModal()">取消</button>
+        <button type="submit">保存</button>
+      </div>
+    </form>
+  </div>
+
   <script>
     const state = {
       currentUrl: '',
@@ -275,14 +337,24 @@
       currentHovered: null,
       navigationHistory: [],
       historyIndex: -1,
-      savedLocators: []
+      savedLocators: [],
+      pendingLocator: null,
+      pendingDefaultName: '',
+      pendingDefaultOwner: ''
     };
 
     const frame = document.getElementById('target-frame');
     const statusBar = document.getElementById('statusBar');
     const frameHint = document.getElementById('frameHint');
+    const midContent = document.getElementById('midContent');
+    const locatorModal = document.getElementById('locatorModal');
+    const locatorForm = document.getElementById('locatorForm');
+    const locatorNameInput = document.getElementById('locatorNameInput');
+    const locatorOwnerInput = document.getElementById('locatorOwnerInput');
 
     window.addEventListener('message', handleFrameMessage);
+    locatorForm.addEventListener('submit', handleLocatorSubmit);
+    document.addEventListener('keydown', handleDocumentKeydown);
     document.addEventListener('DOMContentLoaded', () => {
       renderSavedLibrary();
     });
@@ -301,7 +373,7 @@
       if (type === 'ELEMENT_RIGHT_CLICK') {
         state.currentHovered = payload;
         renderSelectedInfo(payload);
-        saveLocator(payload);
+        openLocatorModal(payload);
         return;
       }
 
@@ -345,6 +417,7 @@
 
       state.currentUrl = normalizedUrl;
       state.currentPageAlias = document.getElementById('pageNameInput').value.trim() || suggestPageAlias(normalizedUrl);
+      state.currentHovered = null;
 
       if (updateInput) {
         document.getElementById('urlInput').value = normalizedUrl;
@@ -362,7 +435,8 @@
         frame.removeAttribute('srcdoc');
       }
 
-      frame.src = `/proxy?url=${encodeURIComponent(normalizedUrl)}`;
+      renderSelectedPlaceholder();
+      frame.src = `/proxy?url=${encodeURIComponent(normalizedUrl)}&_ts=${Date.now()}`;
       frameHint.textContent = state.currentPageAlias || '当前页面';
       statusBar.textContent = `正在加载：${normalizedUrl}`;
       updateNavigationButtons();
@@ -395,7 +469,7 @@
         ['元素名称', info.elementName || ''],
         ['元素类型', info.elementType || ''],
         ['标签', info.tag || ''],
-        ['ID', info.id || ''],
+        ['ID', info.idPreview || info.id || ''],
         ['Class', info.class || ''],
         ['Name', info.name || ''],
         ['XPath', info.xpath || ''],
@@ -403,7 +477,7 @@
         ['文本预览', info.text || '']
       ];
 
-      document.getElementById('midContent').innerHTML = values.map(([label, value], index) => `
+      midContent.innerHTML = values.map(([label, value], index) => `
         <div class="info-card">
           <div class="info-label">${label}</div>
           <div class="info-value" id="info-${index}">${escapeHtml(String(value || ''))}</div>
@@ -412,13 +486,63 @@
       `).join('');
     }
 
-    function saveLocator(info) {
-      const defaultName = buildDefaultElementName(info);
-      const elementName = window.prompt('请输入元素名称：', defaultName);
-      if (elementName === null) return;
+    function renderSelectedPlaceholder() {
+      midContent.innerHTML = '<div class="placeholder">将鼠标悬停到左侧页面中的可交互元素后，在这里实时显示 `id`、`name`、`class`、`xpath` 等定位信息。</div>';
+    }
 
+    function openLocatorModal(info) {
+      const defaultName = buildDefaultElementName(info);
+      const defaultOwner = document.getElementById('pageNameInput').value.trim()
+        || state.currentPageAlias
+        || (state.currentUrl ? suggestPageAlias(state.currentUrl) : '页面');
+
+      state.pendingLocator = info;
+      state.pendingDefaultName = defaultName;
+      state.pendingDefaultOwner = defaultOwner;
+      locatorNameInput.value = defaultName;
+      locatorOwnerInput.value = defaultOwner;
+      locatorModal.hidden = false;
+      locatorNameInput.focus();
+      locatorNameInput.select();
+    }
+
+    function closeLocatorModal() {
+      locatorModal.hidden = true;
+      state.pendingLocator = null;
+      state.pendingDefaultName = '';
+      state.pendingDefaultOwner = '';
+    }
+
+    function handleModalBackdropClick(event) {
+      if (event.target === locatorModal) {
+        closeLocatorModal();
+      }
+    }
+
+    function handleDocumentKeydown(event) {
+      if (event.key === 'Escape' && !locatorModal.hidden) {
+        closeLocatorModal();
+      }
+    }
+
+    function handleLocatorSubmit(event) {
+      event.preventDefault();
+      if (!state.pendingLocator) {
+        return;
+      }
+
+      saveLocator(
+        state.pendingLocator,
+        locatorNameInput.value.trim() || state.pendingDefaultName,
+        locatorOwnerInput.value.trim() || state.pendingDefaultOwner
+      );
+      closeLocatorModal();
+    }
+
+    function saveLocator(info, elementName, elementOwner) {
       const savedItem = {
-        '元素名称': elementName.trim() || defaultName,
+        '元素归属': elementOwner,
+        '元素名称': elementName,
         '元素类型': info.elementType || info.tag || '',
         'id': info.id || '',
         'class': info.class || '',
@@ -449,6 +573,7 @@
             <div class="saved-title">${escapeHtml(item.data['元素名称'])}</div>
             <button onclick="deleteSavedItem(${index})">删除</button>
           </div>
+          <div class="saved-meta">元素归属：${escapeHtml(item.data['元素归属'] || '未分类')}</div>
           <div class="saved-meta">页面别名：${escapeHtml(item.pageAlias || '未命名页面')}</div>
           <div class="saved-meta">页面 URL：${escapeHtml(item.pageUrl || '')}</div>
           <pre class="saved-json">${escapeHtml(JSON.stringify(item.data, null, 2))}</pre>
