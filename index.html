@@ -384,6 +384,11 @@
 
       if (type === 'NAVIGATE_TO_URL' && payload?.url) {
         navigateToUrl(payload.url, { updateInput: true, pushHistory: true });
+        return;
+      }
+
+      if (type === 'PAGE_URL_SYNC' && payload?.url) {
+        syncUrlWithoutReload(payload.url);
       }
     }
 
@@ -436,7 +441,7 @@
       }
 
       renderSelectedPlaceholder();
-      frame.src = `/proxy?url=${encodeURIComponent(normalizedUrl)}&_ts=${Date.now()}`;
+      frame.src = `/__nav?url=${encodeURIComponent(normalizedUrl)}&_ts=${Date.now()}`;
       frameHint.textContent = state.currentPageAlias || '当前页面';
       statusBar.textContent = `正在加载：${normalizedUrl}`;
       updateNavigationButtons();
@@ -457,6 +462,25 @@
     function reloadCurrent() {
       if (!state.currentUrl) return;
       navigateToUrl(state.currentUrl, { updateInput: true, pushHistory: false });
+    }
+
+    // SPA 客户端路由（pushState/replaceState/popstate）只同步地址栏与历史，
+    // 不重新加载 iframe，避免打断页面内的前端路由状态。
+    function syncUrlWithoutReload(url) {
+      const normalizedUrl = normalizeUrl(url);
+      if (!normalizedUrl) return;
+
+      state.currentUrl = normalizedUrl;
+      document.getElementById('urlInput').value = normalizedUrl;
+
+      if (state.navigationHistory[state.historyIndex] !== normalizedUrl) {
+        state.navigationHistory = state.navigationHistory.slice(0, state.historyIndex + 1);
+        state.navigationHistory.push(normalizedUrl);
+        state.historyIndex = state.navigationHistory.length - 1;
+      }
+
+      updateNavigationButtons();
+      statusBar.textContent = `当前页面：${normalizedUrl}`;
     }
 
     function updateNavigationButtons() {

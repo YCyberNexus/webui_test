@@ -1,3 +1,4 @@
+const path = require('path');
 const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
@@ -6,8 +7,35 @@ const cors = require('cors');
 const app = express();
 const PORT = 3000;
 
-app.use(cors());
-app.use(express.static('.'));
+// 当前正在代理的目标源（http://host:port）。
+// 通过 /__nav 设置；之后所有同源请求都按原始路径转发到这里。
+let currentTargetOrigin = '';
+
+// 不应原样转发给浏览器的响应头：
+// - 压缩/长度类（axios 已解压，长度会变）
+// - 安全策略类（会阻止 iframe 嵌入、阻止注入的内联脚本、限制跨源资源）
+const HOP_HEADERS = new Set([
+  'content-encoding',
+  'content-length',
+  'transfer-encoding',
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailer',
+  'upgrade',
+  'x-frame-options',
+  'content-security-policy',
+  'content-security-policy-report-only',
+  'strict-transport-security',
+  'public-key-pins',
+  'cross-origin-opener-policy',
+  'cross-origin-embedder-policy',
+  'cross-origin-resource-policy',
+  'report-to',
+  'nel'
+]);
 
 function escapeHtml(value) {
   return String(value)
@@ -27,6 +55,53 @@ function buildInjectedScript(targetUrl) {
     (function () {
       const initialPageUrl = ${toScriptString(targetUrl)};
       let currentPageUrl = initialPageUrl;
+
+      let targetOrigin = '';
+      try {
+        targetOrigin = new URL(initialPageUrl).origin;
+      } catch (error) {
+        targetOrigin = '';
+      }
+
+      // 把指向目标源的绝对地址改写成根相对地址，
+      // 让运行时的请求也走同源代理，避免 CORS。
+      function toSameOriginPath(value) {
+        try {
+          const resolved = new URL(value, currentPageUrl);
+          if (targetOrigin && resolved.origin === targetOrigin) {
+            return resolved.pathname + resolved.search + resolved.hash;
+          }
+          return value;
+        } catch (error) {
+          return value;
+        }
+      }
+
+      const nativeFetch = window.fetch ? window.fetch.bind(window) : null;
+      if (nativeFetch) {
+        window.fetch = function (input, init) {
+          try {
+            if (typeof input === 'string') {
+              input = toSameOriginPath(input);
+            } else if (input && typeof input.url === 'string') {
+              input = new Request(toSameOriginPath(input.url), input);
+            }
+          } catch (error) {
+            // 改写失败时保持原始入参
+          }
+          return nativeFetch(input, init);
+        };
+      }
+
+      const nativeXhrOpen = XMLHttpRequest.prototype.open;
+      XMLHttpRequest.prototype.open = function (method, url) {
+        try {
+          arguments[1] = toSameOriginPath(url);
+        } catch (error) {
+          // 改写失败时保持原始地址
+        }
+        return nativeXhrOpen.apply(this, arguments);
+      };
 
       const interactiveSelector = [
         'a[href]',
@@ -466,11 +541,11 @@ function buildInjectedScript(targetUrl) {
         try {
           originalPushState.apply(history, arguments);
         } catch (error) {
-          // The proxied document may reject target-origin URLs; the parent will reload through the proxy.
+          // 代理文档可能拒绝目标源 URL；父级会同步地址栏，不强制重载
         }
         if (nextUrl) {
           currentPageUrl = nextUrl;
-          postToParent('NAVIGATE_TO_URL', { url: currentPageUrl });
+          postToParent('PAGE_URL_SYNC', { url: currentPageUrl });
         }
       };
 
@@ -480,66 +555,239 @@ function buildInjectedScript(targetUrl) {
         try {
           originalReplaceState.apply(history, arguments);
         } catch (error) {
-          // The proxied document may reject target-origin URLs; the parent will reload through the proxy.
+          // 代理文档可能拒绝目标源 URL；父级会同步地址栏，不强制重载
         }
         if (nextUrl) {
           currentPageUrl = nextUrl;
-          postToParent('NAVIGATE_TO_URL', { url: currentPageUrl });
+          postToParent('PAGE_URL_SYNC', { url: currentPageUrl });
         }
       };
 
       window.addEventListener('popstate', () => {
-        postToParent('NAVIGATE_TO_URL', { url: currentPageUrl });
+        postToParent('PAGE_URL_SYNC', { url: currentPageUrl });
       });
     })();
   `;
 }
 
-app.get('/proxy', async (req, res) => {
-  const targetUrl = req.query.url;
-  if (!targetUrl) {
+// 转发给目标的请求头：去掉会干扰代理的头，并把来源伪装成目标自身，
+// 以兼容后端对 Origin/Referer 的同源校验。
+function buildForwardHeaders(req) {
+  const headers = { ...req.headers };
+  delete headers.host;
+  delete headers.connection;
+  delete headers['content-length'];
+  delete headers['accept-encoding'];
+
+  headers.origin = currentTargetOrigin;
+  if (headers.referer) {
+    try {
+      const parsed = new URL(headers.referer);
+      headers.referer = currentTargetOrigin + parsed.pathname + parsed.search;
+    } catch (error) {
+      headers.referer = currentTargetOrigin + '/';
+    }
+  }
+
+  return headers;
+}
+
+// 把目标下发的 Set-Cookie 调整到当前（localhost）域可用：
+// 去掉 Domain / Secure / SameSite，避免在 http://localhost 下被浏览器丢弃。
+function rewriteSetCookie(cookies) {
+  return [].concat(cookies).map((cookie) => String(cookie)
+    .replace(/;\s*Domain=[^;]*/ig, '')
+    .replace(/;\s*Secure/ig, '')
+    .replace(/;\s*SameSite=[^;]*/ig, ''));
+}
+
+// 重写重定向地址：
+// - 指向目标源 → 改成根相对，让浏览器在同源内继续走代理
+// - 指向其它源 → 转交 /__nav，由代理切换目标源后再继续
+function rewriteLocation(location) {
+  try {
+    const parsed = new URL(location, currentTargetOrigin);
+    if (parsed.origin === currentTargetOrigin) {
+      return parsed.pathname + parsed.search + parsed.hash;
+    }
+    return '/__nav?url=' + encodeURIComponent(parsed.href);
+  } catch (error) {
+    return location;
+  }
+}
+
+function applyResponseHeaders(res, headers) {
+  Object.keys(headers).forEach((key) => {
+    const lowerKey = key.toLowerCase();
+    if (HOP_HEADERS.has(lowerKey) || lowerKey === 'set-cookie' || lowerKey === 'content-type') {
+      return;
+    }
+    if (lowerKey === 'location') {
+      res.set('location', rewriteLocation(headers[key]));
+      return;
+    }
+    res.set(key, headers[key]);
+  });
+
+  if (headers['set-cookie']) {
+    res.set('set-cookie', rewriteSetCookie(headers['set-cookie']));
+  }
+
+  const contentType = headers['content-type'];
+  if (contentType && !String(contentType).includes('html')) {
+    res.set('content-type', contentType);
+  }
+}
+
+// 把 HTML 里指向目标源的绝对地址改写成根相对，剥离会导致校验失败的属性，
+// 并注入定位脚本。注意：不再写入 <base>，相对路径会自然落到同源代理。
+function processHtml(html, pageUrl) {
+  const $ = cheerio.load(html, { decodeEntities: false });
+
+  if ($('head').length === 0) {
+    $('html').prepend('<head></head>');
+  }
+
+  let pageOrigin = '';
+  try {
+    pageOrigin = new URL(pageUrl).origin;
+  } catch (error) {
+    pageOrigin = '';
+  }
+
+  const toRel = (value) => {
+    if (value === undefined || value === null) {
+      return value;
+    }
+    const raw = String(value).trim();
+    if (!raw || /^(data:|blob:|javascript:|mailto:|tel:|#)/i.test(raw)) {
+      return value;
+    }
+    try {
+      const resolved = new URL(raw, pageUrl);
+      if (pageOrigin && resolved.origin === pageOrigin) {
+        return resolved.pathname + resolved.search + resolved.hash;
+      }
+      return value;
+    } catch (error) {
+      return value;
+    }
+  };
+
+  const urlAttrs = ['src', 'href', 'action', 'data', 'poster', 'formaction'];
+  $('[src],[href],[action],[data],[poster],[formaction]').each((index, element) => {
+    const $el = $(element);
+    urlAttrs.forEach((attr) => {
+      const value = $el.attr(attr);
+      if (value !== undefined) {
+        $el.attr(attr, toRel(value));
+      }
+    });
+  });
+
+  $('[srcset]').each((index, element) => {
+    const $el = $(element);
+    const value = $el.attr('srcset');
+    if (!value) {
+      return;
+    }
+    const rewritten = value.split(',').map((part) => {
+      const segment = part.trim();
+      if (!segment) {
+        return segment;
+      }
+      const pieces = segment.split(/\s+/);
+      pieces[0] = toRel(pieces[0]);
+      return pieces.join(' ');
+    }).join(', ');
+    $el.attr('srcset', rewritten);
+  });
+
+  // 同源后这些属性已无意义，且 integrity 会因 CSS 改写而校验失败
+  $('[integrity]').removeAttr('integrity');
+  $('[crossorigin]').removeAttr('crossorigin');
+
+  $('body').append('<script>' + buildInjectedScript(pageUrl) + '</script>');
+
+  return $.html();
+}
+
+app.use(cors());
+
+// 工具自身的界面（注意只占用 /index.html，让站点根路径留给被代理页面）
+app.get('/index.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// 设置目标源并跳转到镜像路径；iframe 的 src 指向这里
+app.get('/__nav', (req, res) => {
+  const rawUrl = req.query.url;
+  if (!rawUrl) {
     res.status(400).send('Missing url');
     return;
   }
 
+  let parsed;
   try {
-    const response = await axios.get(targetUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-      },
-      timeout: 15000,
-      responseType: 'text'
-    });
-
-    const html = response.data;
-    const $ = cheerio.load(html, { decodeEntities: false });
-
-    if ($('head').length === 0) {
-      $('html').prepend('<head></head>');
-    }
-
-    $('head').prepend('<base href="' + escapeHtml(targetUrl) + '">');
-    $('body').append('<script>' + buildInjectedScript(targetUrl) + '</script>');
-
-    res.send($.html());
+    parsed = new URL(rawUrl);
   } catch (error) {
-    res.status(500).send(`
-      <!DOCTYPE html>
-      <html lang="zh-CN">
-      <head>
-        <meta charset="UTF-8">
-        <title>加载失败</title>
-      </head>
-      <body style="margin:0;padding:24px;font-family:PingFang SC,Microsoft YaHei,sans-serif;background:#f8fafc;color:#334155;">
-        <h2 style="margin-bottom:12px;">页面加载失败</h2>
-        <p style="margin-bottom:8px;">目标地址：${escapeHtml(targetUrl)}</p>
-        <p style="margin-bottom:0;">错误信息：${escapeHtml(error.message)}</p>
-      </body>
-      </html>
-    `);
+    res.status(400).send('Invalid url');
+    return;
   }
+
+  currentTargetOrigin = parsed.origin;
+  const dest = (parsed.pathname || '/') + parsed.search;
+  res.redirect(302, dest);
+});
+
+// 代理路径需要拿到原始请求体（转发 POST/PUT 等接口调用）
+app.use(express.raw({ type: () => true, limit: '50mb' }));
+
+// 兜底：除上面的工具路由外，所有请求都按原始路径转发到当前目标源
+app.use(async (req, res) => {
+  if (!currentTargetOrigin) {
+    if (req.path === '/') {
+      res.redirect(302, '/index.html');
+      return;
+    }
+    res.status(502).send('尚未设置目标页面，请在工具中输入 URL 后点击“加载页面”。');
+    return;
+  }
+
+  const targetUrl = currentTargetOrigin + req.originalUrl;
+  let upstream;
+  try {
+    upstream = await axios.request({
+      method: req.method,
+      url: targetUrl,
+      headers: buildForwardHeaders(req),
+      data: (req.method === 'GET' || req.method === 'HEAD') ? undefined : req.body,
+      responseType: 'arraybuffer',
+      timeout: 20000,
+      maxRedirects: 0,
+      decompress: true,
+      validateStatus: () => true
+    });
+  } catch (error) {
+    res.status(502).send('代理请求失败：' + escapeHtml(error.message));
+    return;
+  }
+
+  applyResponseHeaders(res, upstream.headers);
+
+  const contentType = String(upstream.headers['content-type'] || '');
+  if (contentType.includes('html')) {
+    const html = Buffer.from(upstream.data).toString('utf8');
+    res.status(upstream.status);
+    res.set('content-type', 'text/html; charset=utf-8');
+    res.send(processHtml(html, targetUrl));
+    return;
+  }
+
+  res.status(upstream.status);
+  res.send(Buffer.from(upstream.data));
 });
 
 app.listen(PORT, () => {
-  console.log(`代理服务运行中: http://localhost:${PORT}`);
+  console.log(`代理服务运行中: http://localhost:${PORT}/index.html`);
 });
